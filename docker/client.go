@@ -233,6 +233,7 @@ func NewVersionedClient(endpoint string, apiVersionString string) (*Client, erro
 				DialContext: helper.Dialer,
 			},
 		}
+		endpoint = helper.Host
 	}
 
 	c := &Client{
