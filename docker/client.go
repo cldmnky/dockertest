@@ -1047,6 +1047,7 @@ func parseEndpoint(endpoint string, tls bool) (*url.URL, error) {
 		}
 		return nil, ErrInvalidEndpoint
 	case "ssh":
+		u.Scheme = "http"
 		return u, nil
 	default:
 		return nil, ErrInvalidEndpoint
