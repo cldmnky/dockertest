@@ -32,10 +32,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/docker/cli/cli/connhelper"
 	"github.com/ory/dockertest/v3/docker/opts"
 	"github.com/ory/dockertest/v3/docker/pkg/homedir"
 	"github.com/ory/dockertest/v3/docker/pkg/jsonmessage"
 	"github.com/ory/dockertest/v3/docker/pkg/stdcopy"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -205,16 +207,37 @@ func NewVersionedClient(endpoint string, apiVersionString string) (*Client, erro
 	if err != nil {
 		return nil, err
 	}
-	var requestedAPIVersion APIVersion
+	var (
+		requestedAPIVersion APIVersion
+		httpClient          = defaultClient()
+		dialer              = &net.Dialer{}
+	)
 	if strings.Contains(apiVersionString, ".") {
 		requestedAPIVersion, err = NewAPIVersion(apiVersionString)
 		if err != nil {
 			return nil, err
 		}
 	}
+	if u.Scheme == "ssh" {
+		dockerHost := os.Getenv("DOCKER_HOST")
+		if dockerHost == "" {
+			return nil, fmt.Errorf("Error: DOCKER_HOST must be set to the docker host you want to connect to")
+		}
+		helper, err := connhelper.GetConnectionHelper(dockerHost)
+		if err != nil {
+			logrus.Debugf("unable to get ssh connection helper: %s", err)
+			return nil, err
+		}
+		httpClient = &http.Client{
+			Transport: &http.Transport{
+				DialContext: helper.Dialer,
+			},
+		}
+	}
+
 	c := &Client{
-		HTTPClient:          defaultClient(),
-		Dialer:              &net.Dialer{},
+		HTTPClient:          httpClient,
+		Dialer:              dialer,
 		endpoint:            endpoint,
 		endpointURL:         u,
 		eventMonitor:        new(eventMonitoringState),
@@ -1023,6 +1046,8 @@ func parseEndpoint(endpoint string, tls bool) (*url.URL, error) {
 			return u, nil
 		}
 		return nil, ErrInvalidEndpoint
+	case "ssh":
+		return u, nil
 	default:
 		return nil, ErrInvalidEndpoint
 	}
