@@ -234,6 +234,7 @@ func NewVersionedClient(endpoint string, apiVersionString string) (*Client, erro
 			},
 		}
 		endpoint = helper.Host
+		u, err = parseEndpoint(endpoint, false)
 	}
 
 	c := &Client{
